@@ -67,9 +67,13 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
-	struct hash_elem *hash_elem = hash_find(&spt->spt_hash, &page->hash_elem);
-	page = hash_entry(hash_elem, struct page, hash_elem);
-	return page;
+	page = (struct page *)malloc(sizeof(struct page)); // va를 찾기 위한 임시 페이지 할당
+	page -> va = pg_round_down(va);
+
+	struct hash_elem *e = hash_find(&spt->spt_hash, &page->hash_elem);
+	free(page); // 임시 페이지 해제
+	page = hash_entry(e, struct page, hash_elem);
+    return e != NULL ? hash_entry(e, struct page, hash_elem) : NULL;
 }
 
 /* Insert PAGE into spt with validation. */
