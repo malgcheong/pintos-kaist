@@ -110,19 +110,23 @@ vm_evict_frame (void) {
 	return NULL;
 }
 
+/* 유저풀에서 빈 frame 반환하는 함수 */
 /* palloc() and get frame. If there is no available page, evict the page
  * and return it. This always return valid address. That is, if the user pool
  * memory is full, this function evicts the frame to get the available memory
  * space.*/
 static struct frame *
 vm_get_frame (void) {
-	struct frame *frame = NULL;
 	/* TODO: Fill this function. */
+	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
+
+	frame -> kva = palloc_get_page(PAL_USER);
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
 	return frame;
 }
+
 
 /* Growing the stack. */
 static void
@@ -159,6 +163,9 @@ bool
 vm_claim_page (void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function */
+	page = spt_find_page(&thread_current()->spt,va);
+	if(page==NULL)
+		return false;
 
 	return vm_do_claim_page (page);
 }
@@ -173,7 +180,10 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-
+    if (!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)){
+		palloc_free_page(frame->kva);
+		return false;
+	}
 	return swap_in (page, frame->kva);
 }
 
