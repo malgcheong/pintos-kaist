@@ -67,7 +67,8 @@ struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 	struct page *page = NULL;
 	/* TODO: Fill this function. */
-
+	struct hash_elem *hash_elem = hash_find(&spt->spt_hash, &page->hash_elem);
+	page = hash_entry(hash_elem, struct page, hash_elem);
 	return page;
 }
 
@@ -77,6 +78,9 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 		struct page *page UNUSED) {
 	int succ = false;
 	/* TODO: Fill this function. */
+	if(!hash_insert(&spt->spt_hash, &page->hash_elem)){
+		succ = true;
+	}
 
 	return succ;
 }
