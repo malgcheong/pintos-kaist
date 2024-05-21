@@ -40,9 +40,10 @@ static struct frame *vm_get_victim (void);
 static bool vm_do_claim_page (struct page *page);
 static struct frame *vm_evict_frame (void);
 
-/* Create the pending page object with initializer. If you want to create a
- * page, do not create it directly and make it through this function or
- * `vm_alloc_page`. */
+
+/* pending 중인 페이지 객체를 초기화하고 생성합니다.
+ * 페이지를 생성하려면 직접 생성하지 말고 이 함수나 vm_alloc_page를 통해 만드세요.
+ * init과 aux는 첫 page fault가 발생할 때 호출된다. */
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
@@ -58,6 +59,21 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		 * TODO: should modify the field after calling the uninit_new. */
 
 		/* TODO: Insert the page into the spt. */
+		struct page *p = (struct page*)malloc(sizeof(struct page));
+		bool (*page_initializer)(struct page *, enum vm_type, void *);
+
+		switch (VM_TYPE(type))
+		{
+			case VM_ANON:
+				page_initializer = anon_initializer;
+				break;
+			case VM_FILE:
+				page_initializer = file_backed_initializer;
+				break;
+		}
+		/* init은 lazy_load_segment함수이고 이 함수는 페이지 폴트 핸들러에서 호출되어야 함 */
+		uninit_new(p, upage, init, type, aux, page_initializer);
+		p->writable = writable;
 	}
 err:
 	return false;
