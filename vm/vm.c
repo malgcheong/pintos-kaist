@@ -74,6 +74,8 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		/* init은 lazy_load_segment함수이고 이 함수는 페이지 폴트 핸들러에서 호출되어야 함 */
 		uninit_new(p, upage, init, type, aux, page_initializer);
 		p->writable = writable;
+		/* TODO: Insert the page into the spt. */
+        return spt_insert_page(spt, p);
 	}
 err:
 	return false;
