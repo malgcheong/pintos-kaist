@@ -845,10 +845,21 @@ static bool lazy_load_segment(struct page *page, void *aux) {
     /* TODO: 파일에서 세그먼트를 로드합니다. */
     /* TODO: 이 함수는 주소 VA에서 처음 페이지 폴트가 발생할 때 호출됩니다. */
     /* TODO: 호출하는 동안 VA를 사용할 수 있습니다. */
+    struct container *container = aux;
+    struct file *file = container->file;
+    off_t offset = container->offset;
+    size_t page_read_bytes = container->page_read_bytes;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+    file_seek(file, offset);                                                             // 파일을 offset부터 읽기
+    if (file_read(file, page->frame->kva, page_read_bytes) != (off_t)page_read_bytes) {  // 물리 메모리에서 정상적으로 읽어오는지 확인하고
+        palloc_free_page(page->frame->kva);                                              // 제대로 못 읽었다면 free시키고 false 리턴
+        return false;
+    }
 
+    memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);  // 남은 page의 데이터들은 0으로 초기화
 
-    
+    return true;    
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -880,8 +891,13 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage, uint32_t 
         size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
         /* TODO: Set up aux to pass information to the lazy_load_segment. */
-        void *aux = NULL;
-        if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, aux))
+		/* container 생성 */
+		struct container *container = (struct container *)malloc(sizeof(struct container));
+		container->file = file;
+		container->page_read_bytes = page_read_bytes;
+		container->offset = ofs;
+		
+        if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, container))
             return false;
 
         /* Advance. */
