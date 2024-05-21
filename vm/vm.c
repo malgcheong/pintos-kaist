@@ -2,6 +2,7 @@
 
 #include "threads/malloc.h"
 #include "vm/vm.h"
+#include "threads/vaddr.h"
 #include "vm/inspect.h"
 #include <hash.h>
 
