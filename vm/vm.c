@@ -145,6 +145,7 @@ vm_get_frame (void) {
 
 	frame -> kva = palloc_get_page(PAL_USER);
 
+	frame->page = NULL;
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
 	return frame;
