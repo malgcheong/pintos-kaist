@@ -182,6 +182,7 @@ struct thread {
 	/* 스레드가 소유한 전체 가상 메모리에 대한 테이블. */
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	void *stack_bottom;
 #endif
 
 	/* Owned by thread.c. */
