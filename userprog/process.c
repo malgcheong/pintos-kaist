@@ -533,16 +533,15 @@ struct ELF64_hdr {                     // 실행파일을 위한 파일 형식
 };
 
 struct ELF64_PHDR {
-    uint32_t p_type;
-    uint32_t p_flags;
-    uint64_t p_offset;
-    uint64_t p_vaddr;
-    uint64_t p_paddr;
-    uint64_t p_filesz;
-    uint64_t p_memsz;
-    uint64_t p_align;
+    uint32_t p_type;     // 세그먼트 타입 (Segment type)
+    uint32_t p_flags;    // 세그먼트 플래그 (Segment flags)
+    uint64_t p_offset;   // 파일 오프셋 (File offset)
+    uint64_t p_vaddr;    // 가상 주소 (Virtual address)
+    uint64_t p_paddr;    // 물리 주소 (Physical address)
+    uint64_t p_filesz;   // 파일 내 크기 (Size in file)
+    uint64_t p_memsz;    // 메모리 내 크기 (Size in memory)
+    uint64_t p_align;    // 정렬 (Alignment)
 };
-
 /* 약어 */
 /* Abbreviations */
 #define ELF ELF64_hdr
@@ -556,10 +555,6 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage, uint32_t 
  * 실행 가능한 진입점을 *RIP에 저장하고
  * 초기 스택 포인터를 *RSP에 저장합니다.
  * 성공하면 true를 반환하고, 그렇지 않으면 false를 반환합니다. */
-/* Loads an ELF executable from FILE_NAME into the current thread.
- * Stores the executable's entry point into *RIP
- * and its initial stack pointer into *RSP.
- * Returns true if successful, false otherwise. */
 static bool load(const char *file_name, struct intr_frame *if_) {
     process_init();
     struct thread *t = thread_current();
@@ -570,15 +565,12 @@ static bool load(const char *file_name, struct intr_frame *if_) {
     int i;
 
     /* 페이지 디렉터리를 할당하고 활성화합니다. */
-    /* Allocate and activate page directory. */
     t->pml4 = pml4_create(); // 페이지 디렉토리 생성
     if (t->pml4 == NULL)
         goto done;
     process_activate(thread_current()); // 페이지 테이블 활성화
 
     /* (프로그램 파일) 실행 파일을 엽니다. */
-    /* Open executable file. */
-    
     lock_acquire(&filesys_lock);
     file = filesys_open(file_name);
     if (file == NULL) {
@@ -591,7 +583,6 @@ static bool load(const char *file_name, struct intr_frame *if_) {
     lock_release(&filesys_lock);
 
     /* 실행 가능한 헤더를 읽고 확인합니다. */
-    /* Read and verify executable header. */
     if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E  // amd64
         || ehdr.e_version != 1 || ehdr.e_phentsize != sizeof(struct Phdr) || ehdr.e_phnum > 1024) {
         printf("load: %s: error loading executable\n", file_name);
@@ -599,7 +590,6 @@ static bool load(const char *file_name, struct intr_frame *if_) {
     }
 
     /* 프로그램 헤더를 읽습니다. */
-    /* Read program headers. */
     file_ofs = ehdr.e_phoff;
     for (i = 0; i < ehdr.e_phnum; i++) {
         struct Phdr phdr;
@@ -618,7 +608,6 @@ static bool load(const char *file_name, struct intr_frame *if_) {
             case PT_STACK:
             default:
                 /* 이 세그먼트를 무시합니다. */
-                /* Ignore this segment. */
                 break;
             case PT_DYNAMIC:
             case PT_INTERP:
@@ -634,15 +623,11 @@ static bool load(const char *file_name, struct intr_frame *if_) {
                     if (phdr.p_filesz > 0) {
                         /* 일반적인 세그먼트.
                          * 디스크에서 초기 부분을 읽고 나머지는 0으로 설정합니다. */
-                        /* Normal segment.
-                         * Read initial part from disk and zero the rest. */
                         read_bytes = page_offset + phdr.p_filesz;
                         zero_bytes = (ROUND_UP(page_offset + phdr.p_memsz, PGSIZE) - read_bytes);
                     } else {
-                        /* 완전히 0입니다.
+                        /* 완전히 0입니다
                          * 디스크에서 아무 것도 읽지 않습니다. */
-                        /* Entirely zero.
-                         * Don't read anything from disk. */
                         read_bytes = 0;
                         zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
                     }
@@ -655,18 +640,14 @@ static bool load(const char *file_name, struct intr_frame *if_) {
     }
 
     /* 스택 설정 */
-    /* Set up stack. */
     if (!setup_stack(if_))
         goto done;
 
     /* 시작 주소 */
-    /* Start address. */
     if_->rip = ehdr.e_entry;
 
     /* TODO: 여기에 코드를 작성하세요.
      * TODO: 인자 전달을 구현하세요 (참조: project2/argument_passing.html). */
-    /* TODO: Your code goes here.
-     * TODO: Implement argument passing (see project2/argument_passing.html). */
 
     success = true;
 
@@ -859,18 +840,15 @@ static bool install_page(void *upage, void *kpage, bool writable) {
 #else
 /* 여기부터는 프로젝트 3 이후에 사용될 코드입니다.
  * 프로젝트 2만을 위해 함수를 구현하려면 위 블록에 구현하세요. */
-/* From here, codes will be used after project 3.
- * If you want to implement the function for only project 2, implement it on the
- * upper block. */
-
+/* Project 3: Anonymous Page - uninit 페이지에 처음 접근하여 페이지 폴트가 발생하면 lazy_load_segment가 실행되어 물리 메모리에 파일 내용이 올라간다. */
 static bool lazy_load_segment(struct page *page, void *aux) {
     /* TODO: 파일에서 세그먼트를 로드합니다. */
     /* TODO: 이 함수는 주소 VA에서 처음 페이지 폴트가 발생할 때 호출됩니다. */
     /* TODO: 호출하는 동안 VA를 사용할 수 있습니다. */
 
-    /* TODO: Load the segment from the file */
-    /* TODO: This called when the first page fault occurs on address VA. */
-    /* TODO: VA is available when calling this function. */
+
+
+    
 }
 
 /* Loads a segment starting at offset OFS in FILE at address
@@ -888,6 +866,8 @@ static bool lazy_load_segment(struct page *page, void *aux) {
  * Return true if successful, false if a memory allocation error
  * or disk read error occurs. */
 static bool load_segment(struct file *file, off_t ofs, uint8_t *upage, uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+    // file_page는 offset이고
+    // mem_page는 upage이다.
     ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
     ASSERT(pg_ofs(upage) == 0);
     ASSERT(ofs % PGSIZE == 0);
