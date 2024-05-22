@@ -403,3 +403,10 @@ bool hash_less (const struct hash_elem *a, const struct hash_elem *b, void *aux)
 	const struct page *b_page = hash_entry(b, struct page, hash_elem);
 	return a_page->va < b_page->va;
 }
+
+/** Project 3: Anonymous Page - 해시 파괴 */
+void hash_destructor(struct hash_elem *e, void *aux) {
+    const struct page *p = hash_entry(e, struct page, hash_elem);
+    destroy(p);
+    free(p);
+}

@@ -53,4 +53,11 @@ anon_swap_out (struct page *page) {
 static void
 anon_destroy (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
+
+    /** Project 3: Anonymous Page - 점거중인 frame 삭제 */
+    if (page->frame) {
+        page->frame->page = NULL;
+        free(page->frame);
+        page->frame = NULL;
+    }
 }
