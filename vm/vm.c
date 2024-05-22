@@ -170,7 +170,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
 	/* TODO: Your code goes here */
-	page = spt_find_page(&thread_current()->spt, addr);
+	page = spt_find_page(spt, addr);
 	
 	/* TODO: Validate the fault */
     if (addr == NULL || is_kernel_vaddr(addr))
@@ -209,11 +209,12 @@ vm_do_claim_page (struct page *page) {
 	page->frame = frame;
 
 	/* TODO: Insert page table entry to map page's VA to frame's PA. */
-    if (!pml4_set_page(thread_current()->pml4, page->va, frame->kva, page->writable)){
-		palloc_free_page(frame->kva);
-		return false;
-	}
-	return swap_in (page, frame->kva);
+    if (frame->page != NULL) {
+        if (!pml4_set_page(thread_current()->pml4,page->va,frame->kva,page->writable))
+            return false;
+    }
+ 
+    return swap_in(page, frame->kva);
 }
 
 /* Initialize new supplemental page table */
