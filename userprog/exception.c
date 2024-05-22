@@ -175,9 +175,6 @@ page_fault (struct intr_frame *f) {
 
 	fault_addr = (void *) rcr2();
 
-	if ( fault_addr == NULL || !is_user_vaddr(fault_addr))
-		exit(-1);
-
 	/* 인터럽트를 다시 켭니다 (CR2가 변경되기 전에 확실하게 읽을 수 있도록). */
 	/* Turn interrupts back on (they were only off so that we could
 	   be assured of reading CR2 before it changed). */
@@ -195,9 +192,13 @@ page_fault (struct intr_frame *f) {
 	if (vm_try_handle_fault (f, fault_addr, user, write, not_present))
 		return;
 #endif
+
 	/* 페이지 폴트 횟수를 셉니다. */
 	/* Count page faults. */
 	page_fault_cnt++;
+
+	/* userprog 테스트 케이스 통과 위해 exit(-1)로 종료합니다. */
+	exit(-1);
 
 	/* 폴트가 진짜 폴트인 경우 정보를 표시하고 종료합니다. */
 	/* If the fault is true fault, show info and exit. */
