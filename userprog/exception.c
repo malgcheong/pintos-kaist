@@ -194,8 +194,7 @@ page_fault (struct intr_frame *f) {
 #endif
 
 	/* userprog 테스트 케이스 통과 위해 exit(-1)로 종료합니다. */
-	if ( fault_addr == NULL || !is_user_vaddr(fault_addr))
-		exit(-1);
+	exit(-1);
 
 	/* 페이지 폴트 횟수를 셉니다. */
 	/* Count page faults. */

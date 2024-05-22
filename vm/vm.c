@@ -223,10 +223,44 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 	hash_init(&spt->spt_hash, hash_function, hash_less, NULL);
 }
 
-/* Copy supplemental page table from src to dst */
-bool
-supplemental_page_table_copy (struct supplemental_page_table *dst UNUSED,
-		struct supplemental_page_table *src UNUSED) {
+/** Project 3: Anonymous Page - Copy supplemental page table from src to dst */
+bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED, struct supplemental_page_table *src UNUSED) {
+    struct hash_iterator iter;
+    struct page *dst_page;
+    struct aux *aux;
+
+    hash_first(&iter, &src->spt_hash);
+
+    while (hash_next(&iter)) {
+        struct page *src_page = hash_entry(hash_cur(&iter), struct page, hash_elem);
+        enum vm_type type = src_page->operations->type;
+        void *upage = src_page->va;
+        bool writable = src_page->writable;
+
+        switch (type) {
+            case VM_UNINIT:  // src 타입이 initialize 되지 않았을 경우
+                if (!vm_alloc_page_with_initializer(page_get_type(src_page), upage, writable, src_page->uninit.init, src_page->uninit.aux))
+                    goto err;
+                break;
+
+            case VM_ANON:                                   // src 타입이 anon인 경우
+                if (!vm_alloc_page(type, upage, writable))  // UNINIT 페이지 생성 및 초기화
+                    goto err;
+
+                if (!vm_claim_page(upage))  // 물리 메모리와 매핑하고 initialize
+                    goto err;
+
+                struct page *dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
+                memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+                break;
+
+            default:
+                goto err;
+        }
+    }
+    return true;
+err:
+    return false;
 }
 
 /* Free the resource hold by the supplemental page table */
@@ -234,4 +268,5 @@ void
 supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
+	hash_clear(&spt->spt_hash, hash_destructor);  // 해시 테이블의 모든 요소 제거
 }
