@@ -578,7 +578,7 @@ static bool load(const char *file_name, struct intr_frame *if_) {
         printf("load: %s: open failed\n", file_name);
         goto done;
     }
-    t -> running = file_reopen(file);
+    t -> running = file;
     file_deny_write(t->running);
     lock_release(&filesys_lock);
 
@@ -654,7 +654,7 @@ static bool load(const char *file_name, struct intr_frame *if_) {
 done:
     /* 로드가 성공했든 실패했든 여기에 도착합니다. */
     /* We arrive here whether the load is successful or not. */
-    file_close(file);
+    //file_close(file); process_exit될떄 running file을 닫아줌
     return success;
 }
 
