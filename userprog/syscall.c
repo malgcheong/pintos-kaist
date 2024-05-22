@@ -18,7 +18,8 @@
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
-void check_address(void *addr);
+struct page* check_address(void *addr);
+void check_valid_buffer(void *buffer, size_t size, bool writable);
 struct file *fd_to_fileptr(int fd);
 void halt();
 void exit(int status);
@@ -135,7 +136,7 @@ void syscall_handler(struct intr_frame *f UNUSED) {
 }
 
 /* 주소 유효성 검수하는 함수 */
-void check_address(void *addr) {
+struct page* check_address(void *addr) {
     struct thread *t = thread_current();
 
     if (addr == NULL || !is_user_vaddr(addr))  // 사용자 영역 주소인지 확인
@@ -145,6 +146,18 @@ void check_address(void *addr) {
             exit(-1);
         }
     } 
+    return spt_find_page(&t->spt, addr);
+}
+
+/** Project 3: Memory Mapped Files - 버퍼 유효성 검사 */
+void check_valid_buffer(void *buffer, size_t size, bool validation) {
+    for (size_t i = 0; i < size; i++) {
+        /* buffer가 spt에 존재하는지 검사 */
+        struct page *page = check_address(buffer + i);
+
+        if (!page || (validation && !(page->writable)))
+            exit(-1);
+    }
 }
 
 /* fd로 file 주소를 반환하는 함수 */
@@ -212,6 +225,9 @@ int open(const char *name) {
 
 /* console 출력하는 함수 */
 int write(int fd, const void *buffer, unsigned size) {
+    // 해당 버퍼가 code segment일지라도 buffer의 값이 변경되는 게 아님.
+    // 해당 버퍼값으로 파일에 입력하는 것일뿐이므로 validation 필요 없음.
+    check_valid_buffer(buffer, size, false);
     check_address(buffer);
     struct file *file = fd_to_fileptr(fd);
     int result;
@@ -279,6 +295,9 @@ int read(int fd, void *buffer, unsigned size) {
     struct file *file = fd_to_fileptr(fd);
 
     // 버퍼가 유효한 주소인지 체크
+    // 해당 버퍼가 code segment일 경우, 해당 버퍼에 쓰이면 안됨.
+    // 검증이 필요하므로 validation을 true로 함
+    check_valid_buffer(buffer, size, true);
     check_address(buffer);
 
     // fd가 0이면 (stdin) input_getc()를 사용해서 키보드 입력을 읽고 버퍼에 저장(?)
