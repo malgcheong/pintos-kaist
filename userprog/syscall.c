@@ -140,8 +140,11 @@ void check_address(void *addr) {
 
     if (addr == NULL || !is_user_vaddr(addr))  // 사용자 영역 주소인지 확인
         exit(-1);
-    if (pml4_get_page(t->pml4, addr) == NULL)  // 페이지로 할당된 영역인지 확인
-        exit(-1);
+    if (pml4_get_page(t->pml4, addr) == NULL) { // 페이지로 할당된 영역인지 확인
+        if(!vm_claim_page(addr)){   // 해당 주소가 페이지에 존재하면 kva 매핑
+            exit(-1);
+        }
+    } 
 }
 
 /* fd로 file 주소를 반환하는 함수 */
