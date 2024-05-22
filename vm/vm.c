@@ -154,7 +154,16 @@ vm_get_frame (void) {
 
 /* Growing the stack. */
 static void
-vm_stack_growth (void *addr UNUSED) {
+vm_stack_growth(void *addr UNUSED) {
+    bool success = false;
+    if (vm_alloc_page(VM_ANON | VM_MARKER_0, addr, true)) {
+        success = vm_claim_page(addr);
+
+        if (success) {
+            /* stack bottom size 갱신 */
+            thread_current()->stack_bottom -= PGSIZE;
+        }
+    }
 }
 
 /* Handle the fault on write_protected page */
@@ -169,15 +178,26 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
+    if (addr == NULL || is_kernel_vaddr(addr) ||!not_present)
+        return false;
+
 	/* TODO: Your code goes here */
 	page = spt_find_page(spt, addr);
 	
-	/* TODO: Validate the fault */
-    if (addr == NULL || is_kernel_vaddr(addr))
-        return false;
-
-	return vm_do_claim_page (page);
+	if (page == NULL) {
+		/** Project 3: Stack Growth */
+		void *stack_pointer = is_kernel_vaddr(f->rsp) ? thread_current()->stack_pointer : f->rsp;
+		/* stack pointer 아래 8바이트는 페이지 폴트 발생 & addr 위치를 USER_STACK에서 1MB로 제한 */
+		if (stack_pointer - 8 <= addr && addr >= STACK_LIMIT && addr <= USER_STACK) {
+			vm_stack_growth(thread_current()->stack_bottom - PGSIZE);
+			return true;
+		}
+		return false;
+	}
+	
+	return vm_do_claim_page(page);
 }
+
 
 /* Free the page.
  * DO NOT MODIFY THIS FUNCTION. */
