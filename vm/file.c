@@ -2,7 +2,10 @@
 
 #include "vm/vm.h"
 /** Project 3: Memory Mapped Files */
+#include "threads/mmu.h"
+#include "threads/vaddr.h"
 #include "userprog/process.h"
+
 
 static bool file_backed_swap_in (struct page *page, void *kva);
 static bool file_backed_swap_out (struct page *page);
@@ -55,10 +58,45 @@ file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
 }
 
-/* Do the mmap */
-void *
-do_mmap (void *addr, size_t length, int writable,
-		struct file *file, off_t offset) {
+/** Project 3: Memory Mapped Files - Memory Mapping - Do the mmap */
+void *do_mmap(void *addr, size_t length, int writable, struct file *file, off_t offset) {
+    struct file *mfile = file_reopen(file);
+    void *ori_addr = addr;
+    size_t read_bytes = (length > file_length(mfile)) ? file_length(mfile) : length;
+    size_t zero_bytes = PGSIZE - read_bytes % PGSIZE;
+
+    ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
+    ASSERT(pg_ofs(addr) == 0);
+    ASSERT(offset % PGSIZE == 0);
+
+    while (read_bytes > 0 || zero_bytes > 0) {
+        size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+        size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+        struct container *container = (struct container *)malloc(sizeof(struct container));
+        if (!container)
+            goto err;
+
+        container->file = mfile;
+        container->offset = offset;
+        container->page_read_bytes = page_read_bytes;
+
+        if (!vm_alloc_page_with_initializer(VM_FILE, addr, writable, lazy_load_segment, container)) {
+            free(container);
+            goto err;
+        }
+
+        read_bytes -= page_read_bytes;
+        zero_bytes -= page_zero_bytes;
+        addr += PGSIZE;
+        offset += page_read_bytes;
+    }
+
+    return ori_addr;
+
+err:
+    printf("Error: do_mmap\n");
+    return NULL;
 }
 
 /* Do the munmap */

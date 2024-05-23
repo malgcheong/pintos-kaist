@@ -841,7 +841,7 @@ static bool install_page(void *upage, void *kpage, bool writable) {
 /* 여기부터는 프로젝트 3 이후에 사용될 코드입니다.
  * 프로젝트 2만을 위해 함수를 구현하려면 위 블록에 구현하세요. */
 /* Project 3: Anonymous Page - uninit 페이지에 처음 접근하여 페이지 폴트가 발생하면 lazy_load_segment가 실행되어 물리 메모리에 파일 내용이 올라간다. */
-static bool lazy_load_segment(struct page *page, void *aux) {
+bool lazy_load_segment(struct page *page, void *aux) {
     /* TODO: 파일에서 세그먼트를 로드합니다. */
     /* TODO: 이 함수는 주소 VA에서 처음 페이지 폴트가 발생할 때 호출됩니다. */
     /* TODO: 호출하는 동안 VA를 사용할 수 있습니다. */
