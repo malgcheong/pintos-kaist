@@ -4,8 +4,6 @@
 /** Project 3: Memory Mapped Files */
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
-#include "threads/mmu.h"
-#include "threads/vaddr.h"
 #include "userprog/process.h"
 
 
@@ -55,9 +53,13 @@ file_backed_swap_out (struct page *page) {
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
-static void
-file_backed_destroy (struct page *page) {
-	struct file_page *file_page UNUSED = &page->file;
+static void file_backed_destroy(struct page *page) {
+    struct file_page *file_page UNUSED = &page->file;
+    if (pml4_is_dirty(thread_current()->pml4, page->va)) {
+        file_write_at(file_page->file, page->va, file_page->page_read_bytes, file_page->offset);
+        pml4_set_dirty(thread_current()->pml4, page->va, false);
+    }
+    pml4_clear_page(thread_current()->pml4, page->va);
 }
 
 /** Project 3: Memory Mapped Files - Memory Mapping - Do the mmap */
