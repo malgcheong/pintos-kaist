@@ -129,6 +129,12 @@ void syscall_handler(struct intr_frame *f UNUSED) {
         case SYS_CLOSE:
             close(f->R.rdi);
             break;
+        case SYS_MMAP:
+            f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+            break;
+        case SYS_MUNMAP:
+            munmap(f->R.rdi);
+            break;
         default:
             thread_exit();
             break;
@@ -387,4 +393,31 @@ int exec (const char *cmd_line) {
         exit(-1);
     }
     return result;
+}
+
+/** Project 3: Memory Mapped Files - Memory Mapping */
+void *mmap(void *addr, size_t length, int writable, int fd, off_t offset) {
+    if (!addr || pg_round_down(addr) != addr || is_kernel_vaddr(addr) || is_kernel_vaddr(addr + length))
+        return NULL;
+
+    if (offset != pg_round_down(offset) || offset % PGSIZE != 0)
+        return NULL;
+
+    if (spt_find_page(&thread_current()->spt, addr))
+        return NULL;
+
+    struct file *file = fd_to_fileptr(fd);
+
+    if ((file >= STDIN_FILENO && file <= STDERR_FILENO) || file == NULL)
+        return NULL;
+
+    if (file_length(file) == 0 || (long)length <= 0)
+        return NULL;
+
+    return do_mmap(addr, length, writable, file, offset);
+}
+
+/** Project 3: Memory Mapped Files - Memory Unmapping */
+void munmap(void *addr) {
+    do_munmap(addr);
 }

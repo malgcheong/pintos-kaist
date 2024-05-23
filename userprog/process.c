@@ -430,16 +430,15 @@ void process_exit(void) {
         struct thread *t = list_entry(child, struct thread, child_elem);
         sema_up(&t->free_sema);
     }
-    // 메모리 누수 방지
-    palloc_free_page(curr->fdt);
     // 실행중에 수정 못하도록
     file_close(curr->running);
-
-    sema_up(&curr->wait_sema); // 기다리고 있는 부모 thread에게 signal 보냄
-    sema_down(&curr->free_sema); // 부모의 exit_status가 정확히 전달되었는지 확인
-
+    // 메모리 누수 방지
+    palloc_free_page(curr->fdt);
     // 추후 프로세스 종료 메시지 구현할 것
     process_cleanup();
+    
+    sema_up(&curr->wait_sema); // 기다리고 있는 부모 thread에게 signal 보냄
+    sema_down(&curr->free_sema); // 부모의 exit_status가 정확히 전달되었는지 확인
 }
 
 /* 현재 프로세스의 리소스를 해제합니다. */
@@ -841,7 +840,7 @@ static bool install_page(void *upage, void *kpage, bool writable) {
 /* 여기부터는 프로젝트 3 이후에 사용될 코드입니다.
  * 프로젝트 2만을 위해 함수를 구현하려면 위 블록에 구현하세요. */
 /* Project 3: Anonymous Page - uninit 페이지에 처음 접근하여 페이지 폴트가 발생하면 lazy_load_segment가 실행되어 물리 메모리에 파일 내용이 올라간다. */
-static bool lazy_load_segment(struct page *page, void *aux) {
+bool lazy_load_segment(struct page *page, void *aux) {
     /* TODO: 파일에서 세그먼트를 로드합니다. */
     /* TODO: 이 함수는 주소 VA에서 처음 페이지 폴트가 발생할 때 호출됩니다. */
     /* TODO: 호출하는 동안 VA를 사용할 수 있습니다. */

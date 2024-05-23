@@ -6,7 +6,7 @@
 #include "vm/inspect.h"
 #include <hash.h>
 
-
+static struct list frame_table;
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 void
@@ -19,6 +19,7 @@ vm_init (void) {
 	register_inspect_intr ();
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
+	list_init(&frame_table);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -114,41 +115,53 @@ spt_remove_page (struct supplemental_page_table *spt, struct page *page) {
 	return true;
 }
 
-/* Get the struct frame, that will be evicted. */
-static struct frame *
-vm_get_victim (void) {
-	struct frame *victim = NULL;
-	 /* TODO: The policy for eviction is up to you. */
+/** Project 3: Memory Management - 제거될 구조체 프레임을 가져옵니다. */
+static struct frame *vm_get_victim(void) {
+    struct frame *victim = NULL;
+    /* TODO: The policy for eviction is up to you. */
+    struct thread *curr = thread_current();
 
-	return victim;
+    // Second Chance 방식으로 결정
+    struct list_elem *e = list_begin(&frame_table);
+    for (e; e != list_end(&frame_table); e = list_next(e)) {
+        victim = list_entry(e, struct frame, frame_elem);
+        if (pml4_is_accessed(curr->pml4, victim->page->va))
+            pml4_set_accessed(curr->pml4, victim->page->va, false);  // pml4가 최근에 사용됐다면 기회를 한번 더 준다.
+        else
+            return victim;
+    }
+
+    return victim;
 }
 
-/* Evict one page and return the corresponding frame.
- * Return NULL on error.*/
-static struct frame *
-vm_evict_frame (void) {
-	struct frame *victim UNUSED = vm_get_victim ();
-	/* TODO: swap out the victim and return the evicted frame. */
+/** Project 3: Memory Management - 한 페이지를 제거하고 해당 프레임을 반환합니다. 오류가 발생하면 NULL을 반환합니다.*/
+static struct frame *vm_evict_frame(void) {
+    struct frame *victim UNUSED = vm_get_victim();
+    /* TODO: swap out the victim and return the evicted frame. */
+    if (victim->page)
+        swap_out(victim->page);
 
-	return NULL;
+    return victim;
 }
 
-/* 유저풀에서 빈 frame 반환하는 함수 */
-/* palloc() and get frame. If there is no available page, evict the page
- * and return it. This always return valid address. That is, if the user pool
- * memory is full, this function evicts the frame to get the available memory
- * space.*/
-static struct frame *
-vm_get_frame (void) {
-	/* TODO: Fill this function. */
-	struct frame *frame = (struct frame*)malloc(sizeof(struct frame));
+/** Project 3: Memory Management - palloc()을 실행하고 프레임을 가져옵니다. 사용 가능한 페이지가 없으면 해당 페이지를 제거하고 반환합니다.
+ *  이는 항상 유효한 주소를 반환합니다. 즉, 사용자 풀 메모리가 가득 찬 경우 이 함수는 사용 가능한 메모리 공간을 확보하기 위해 프레임을 제거합니다.*/
+static struct frame *vm_get_frame(void) {
+    /* TODO: Fill this function. */
+    struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
+    ASSERT(frame != NULL);
 
-	frame -> kva = palloc_get_page(PAL_USER);
+    frame->kva = palloc_get_page(PAL_USER);  // 유저 풀(실제 메모리)에서 페이지를 할당 받는다.
 
-	frame->page = NULL;
-	ASSERT (frame != NULL);
-	ASSERT (frame->page == NULL);
-	return frame;
+    if (frame->kva == NULL)
+        frame = vm_evict_frame();  // Swap Out 수행
+    else
+        list_push_back(&frame_table, &frame->frame_elem);  // frame table에 추가
+
+    frame->page = NULL;
+    ASSERT(frame->page == NULL);
+
+    return frame;
 }
 
 
@@ -166,10 +179,11 @@ vm_stack_growth(void *addr UNUSED) {
     }
 }
 
-/* Handle the fault on write_protected page */
-static bool
-vm_handle_wp (struct page *page UNUSED) {
+/** Project 3: Memory Management - Handle the fault on write_protected page */
+static bool vm_handle_wp(struct page *page UNUSED) {
+    return !(page->writable);
 }
+
 
 /* Return true on success */
 bool
@@ -195,6 +209,9 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		return false;
 	}
 	
+	if (write == vm_handle_wp)  // write protected 인데 write 요청한 경우
+        return false;
+
 	return vm_do_claim_page(page);
 }
 
@@ -270,10 +287,23 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED, st
                 if (!vm_claim_page(upage))  // 물리 메모리와 매핑하고 initialize
                     goto err;
 
-                struct page *dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
+                dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
                 memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
                 break;
 
+            case VM_FILE:                                   // src 타입이 anon인 경우
+                if (!vm_alloc_page_with_initializer(type, upage, writable, NULL, &src_page->file))
+                    goto err;
+
+                dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
+                if (!file_backed_initializer(dst_page, type, NULL))
+                    goto err;
+
+                dst_page->frame = src_page->frame;
+                if (!pml4_set_page(thread_current()->pml4, dst_page->va, src_page->frame->kva, src_page->writable))
+                    goto err;
+
+                break;
             default:
                 goto err;
         }
