@@ -270,10 +270,23 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED, st
                 if (!vm_claim_page(upage))  // 물리 메모리와 매핑하고 initialize
                     goto err;
 
-                struct page *dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
+                dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
                 memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
                 break;
 
+            case VM_FILE:                                   // src 타입이 anon인 경우
+                if (!vm_alloc_page_with_initializer(type, upage, writable, NULL, &src_page->file))
+                    goto err;
+
+                dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
+                if (!file_backed_initializer(dst_page, type, NULL))
+                    goto err;
+
+                dst_page->frame = src_page->frame;
+                if (!pml4_set_page(thread_current()->pml4, dst_page->va, src_page->frame->kva, src_page->writable))
+                    goto err;
+
+                break;
             default:
                 goto err;
         }
