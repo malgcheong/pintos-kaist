@@ -4,6 +4,8 @@
 /** Project 3: Memory Mapped Files */
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
+#include "threads/mmu.h"
+#include "threads/vaddr.h"
 #include "userprog/process.h"
 
 
@@ -99,7 +101,14 @@ err:
     return NULL;
 }
 
-/* Do the munmap */
-void
-do_munmap (void *addr) {
+/** Project 3: Memory Mapped Files - Memory Mapping - Do the munmap */
+void do_munmap(void *addr) {
+    struct thread *curr = thread_current();
+    struct page *page;
+
+    while (page = spt_find_page(&curr->spt, addr)) {
+        destroy(page);
+
+        addr += PGSIZE;
+    }
 }
