@@ -149,6 +149,7 @@ static struct frame *vm_evict_frame(void) {
 static struct frame *vm_get_frame(void) {
     /* TODO: Fill this function. */
     struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
+	frame->reference_cnt = 1;
     ASSERT(frame != NULL);
 
     frame->kva = palloc_get_page(PAL_USER);  // 유저 풀(실제 메모리)에서 페이지를 할당 받는다.
@@ -299,6 +300,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED, st
                 if (!file_backed_initializer(dst_page, type, NULL))
                     goto err;
 
+				src_page->frame->reference_cnt += 1;
                 dst_page->frame = src_page->frame;
                 if (!pml4_set_page(thread_current()->pml4, dst_page->va, src_page->frame->kva, src_page->writable))
                     goto err;

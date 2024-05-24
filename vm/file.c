@@ -59,7 +59,18 @@ static void file_backed_destroy(struct page *page) {
         file_write_at(file_page->file, page->va, file_page->page_read_bytes, file_page->offset);
         pml4_set_dirty(thread_current()->pml4, page->va, false);
     }
-    pml4_clear_page(thread_current()->pml4, page->va);
+ 
+    if (page->frame){
+        if (page->frame->reference_cnt > 1) {
+            page->frame->reference_cnt -= 1;
+            pml4_clear_page(thread_current()->pml4, page->va);
+        } else {
+            list_remove(&page->frame->frame_elem);
+            page->frame->page = NULL;
+            free(page->frame);
+            page->frame = NULL;
+        }
+    }
 }
 
 /** Project 3: Memory Mapped Files - Memory Mapping - Do the mmap */
