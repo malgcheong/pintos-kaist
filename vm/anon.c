@@ -1,7 +1,13 @@
 /* anon.c: Implementation of page for non-disk image (a.k.a. anonymous page). */
+#include <bitmap.h>
 
 #include "vm/vm.h"
 #include "devices/disk.h"
+#include "threads/vaddr.h"
+
+/** Project 3: Swap In/Out - 한 페이지를 섹터 단위로 관리 */
+#define SECTOR_SIZE (PGSIZE / DISK_SECTOR_SIZE)
+
 
 /* DO NOT MODIFY BELOW LINE */
 static struct disk *swap_disk;
@@ -21,7 +27,14 @@ static const struct page_operations anon_ops = {
 void
 vm_anon_init (void) {
 	/* TODO: Set up the swap_disk. */
-	swap_disk = NULL;
+	swap_disk = disk_get(1,1);
+    /* disk_size는 섹터를 반환함. 섹터 1개당 512byte임.
+	 * 우리는 페이지 단위로 swap in out을 진행할 것임. 
+	 * 섹터 8개 = 페이지 이므로 8로 나누면 swap_size는 페이지 단위 개수로 환산됨. */
+	size_t swap_size = disk_size(swap_disk) / SECTOR_SIZE;
+
+	/* 페이지 단위로 swap in out 진행하므로 페이지 수만큼 비트를 생성해줌. */
+    struct bitmap *swap_table = bitmap_create(swap_size);
 }
 
 /* Initialize the file mapping */
