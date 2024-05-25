@@ -118,10 +118,16 @@ err:
 void do_munmap(void *addr) {
     struct thread *curr = thread_current();
     struct page *page;
-
+    struct file *file;
+    page = spt_find_page(&curr->spt, addr);
+    if (page){
+        file = page->file.file;
+    }
+    
     while (page = spt_find_page(&curr->spt, addr)) {
         destroy(page);
-
         addr += PGSIZE;
     }
+
+    file_close(file);
 }

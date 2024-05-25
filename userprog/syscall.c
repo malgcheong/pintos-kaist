@@ -234,7 +234,6 @@ int write(int fd, const void *buffer, unsigned size) {
     // 해당 버퍼가 code segment일지라도 buffer의 값이 변경되는 게 아님.
     // 해당 버퍼값으로 파일에 입력하는 것일뿐이므로 validation 필요 없음.
     check_valid_buffer(buffer, size, false);
-    check_address(buffer);
     struct file *file = fd_to_fileptr(fd);
     int result;
 
@@ -304,7 +303,6 @@ int read(int fd, void *buffer, unsigned size) {
     // 해당 버퍼가 code segment일 경우, 해당 버퍼에 쓰이면 안됨.
     // 검증이 필요하므로 validation을 true로 함
     check_valid_buffer(buffer, size, true);
-    check_address(buffer);
 
     // fd가 0이면 (stdin) input_getc()를 사용해서 키보드 입력을 읽고 버퍼에 저장(?)
     if (fd == 0) {
