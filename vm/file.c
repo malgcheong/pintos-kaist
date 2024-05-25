@@ -59,7 +59,18 @@ static void file_backed_destroy(struct page *page) {
         file_write_at(file_page->file, page->va, file_page->page_read_bytes, file_page->offset);
         pml4_set_dirty(thread_current()->pml4, page->va, false);
     }
-    pml4_clear_page(thread_current()->pml4, page->va);
+ 
+    if (page->frame){
+        if (page->frame->reference_cnt > 1) {
+            page->frame->reference_cnt -= 1;
+            pml4_clear_page(thread_current()->pml4, page->va);
+        } else {
+            list_remove(&page->frame->frame_elem);
+            page->frame->page = NULL;
+            free(page->frame);
+            page->frame = NULL;
+        }
+    }
 }
 
 /** Project 3: Memory Mapped Files - Memory Mapping - Do the mmap */
@@ -107,10 +118,16 @@ err:
 void do_munmap(void *addr) {
     struct thread *curr = thread_current();
     struct page *page;
-
+    struct file *file;
+    page = spt_find_page(&curr->spt, addr);
+    if (page){
+        file = page->file.file;
+    }
+    
     while (page = spt_find_page(&curr->spt, addr)) {
         destroy(page);
-
         addr += PGSIZE;
     }
+
+    file_close(file);
 }

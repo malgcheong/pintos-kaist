@@ -56,6 +56,7 @@ anon_destroy (struct page *page) {
 
     /** Project 3: Anonymous Page - 점거중인 frame 삭제 */
     if (page->frame) {
+		list_remove(&page->frame->frame_elem);
         page->frame->page = NULL;
         free(page->frame);
         page->frame = NULL;
