@@ -210,7 +210,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		return false;
 	}
 	
-	if (write == vm_handle_wp)  // write protected 인데 write 요청한 경우
+	if (write & vm_handle_wp(page))  // write protected 인데 write 요청한 경우
         return false;
 
 	return vm_do_claim_page(page);
