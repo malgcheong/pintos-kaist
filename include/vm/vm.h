@@ -50,6 +50,7 @@ struct page {
 	/* Your implementation */
 	struct hash_elem hash_elem;
 	bool writable;
+	bool accessible;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -117,5 +118,7 @@ bool vm_alloc_page_with_initializer (enum vm_type type, void *upage,
 void vm_dealloc_page (struct page *page);
 bool vm_claim_page (void *va);
 enum vm_type page_get_type (struct page *page);
-
+bool vm_copy_claim_page(struct supplemental_page_table *dst, void *va, void *kva, bool writable);
 #endif  /* VM_VM_H */
+
+
