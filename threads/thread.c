@@ -848,7 +848,7 @@ void donate_priority(void) {
     struct thread *curr = thread_current();
 
     for (depth = 0; depth < 8 ; depth++) {
-        if(!curr->wait_on_lock) 
+        if(!curr->wait_on_lock || curr->wait_on_lock->holder == NULL) 
             break;
         struct thread *holder = curr->wait_on_lock->holder;
         holder->priority = curr->priority;

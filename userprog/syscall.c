@@ -205,28 +205,44 @@ void exit(int status) {
 
 bool create(const char *name, unsigned initial_size) {
     check_address(name);
-    return filesys_create(name, initial_size);
+
+    lock_acquire(&filesys_lock);
+    bool success = filesys_create(name, initial_size);
+    lock_release(&filesys_lock);
+
+    return success;
 }
 
 bool remove(const char *name) {
     check_address(name);
-    return filesys_remove(name);
+
+    lock_acquire(&filesys_lock);
+    bool success = filesys_remove(name);
+    lock_release(&filesys_lock);
+
+    return success;
 }
 
-int open(const char *name) {
-    check_address(name);
-    struct file *file_obj = filesys_open(name);
-    if (file_obj == NULL) {
-        return -1;
-    }
+/** #Project 2: System Call - Open File */
+int open(const char *file) {
+    check_address(file);
 
-    int fd = add_file_to_fdt(file_obj);
+    lock_acquire(&filesys_lock);
+    struct file *newfile = filesys_open(file);
 
-    if (fd == -1) {
-        file_close(file_obj);
-    }
+    if (newfile == NULL)
+        goto err;
 
+    int fd = add_file_to_fdt(newfile);
+
+    if (fd == -1)
+        file_close(newfile);
+
+    lock_release(&filesys_lock);
     return fd;
+err:
+    lock_release(&filesys_lock);
+    return -1;
 }
 
 /* console 출력하는 함수 */

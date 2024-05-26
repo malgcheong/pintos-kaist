@@ -182,7 +182,22 @@ vm_stack_growth(void *addr UNUSED) {
 
 /** Project 3: Memory Management - Handle the fault on write_protected page */
 static bool vm_handle_wp(struct page *page UNUSED) {
-    return !(page->writable);
+	if (!page->accessible)
+		return false;
+
+	void *kva = page->frame->kva;
+
+	page->frame->kva = palloc_get_page(PAL_USER);
+
+	if(page->frame->kva == NULL)
+		page->frame = vm_evict_frame();
+
+	memcpy(page->frame->kva, kva, PGSIZE);
+
+	if(!pml4_set_page(thread_current()->pml4, page->va, page->frame->kva, page->accessible))
+		return false;
+
+	return true;
 }
 
 
@@ -191,13 +206,16 @@ bool
 vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		bool user UNUSED, bool write UNUSED, bool not_present UNUSED) {
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
-	struct page *page = NULL;
+	struct page *page = spt_find_page(spt, addr);
+
 	/* TODO: Validate the fault */
-    if (addr == NULL || is_kernel_vaddr(addr) ||!not_present)
+    if (addr == NULL || is_kernel_vaddr(addr))
         return false;
 
 	/* TODO: Your code goes here */
-	page = spt_find_page(spt, addr);
+
+	if (!not_present && write)
+		return vm_handle_wp(page);
 	
 	if (page == NULL) {
 		/** Project 3: Stack Growth */
@@ -209,9 +227,6 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 		}
 		return false;
 	}
-	
-	if (write & vm_handle_wp(page))  // write protected 인데 write 요청한 경우
-        return false;
 
 	return vm_do_claim_page(page);
 }
@@ -285,11 +300,15 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED, st
                 if (!vm_alloc_page(type, upage, writable))  // UNINIT 페이지 생성 및 초기화
                     goto err;
 
-                if (!vm_claim_page(upage))  // 물리 메모리와 매핑하고 initialize
-                    goto err;
+                // if (!vm_claim_page(upage))  // 물리 메모리와 매핑하고 initialize
+                //     goto err;
+				
+                // dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
+                // memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 
-                dst_page = spt_find_page(dst, upage);  // 대응하는 물리 메모리 데이터 복제
-                memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+				if(!vm_copy_claim_page(dst, upage, src_page->frame->kva, writable))	// 물리 메모리와 매핑하고 initialize
+					goto err;
+
                 break;
 
             case VM_FILE:                                   // src 타입이 anon인 경우
@@ -321,4 +340,31 @@ supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
 	hash_clear(&spt->spt_hash, hash_destructor);  // 해시 테이블의 모든 요소 제거
+}
+
+bool vm_copy_claim_page(struct supplemental_page_table *dst, void *va, void *kva, bool writable) {
+	struct page *page = spt_find_page(dst, va);
+
+	if (page == NULL)
+		return false;
+
+	struct frame *frame = (struct frame *)malloc(sizeof(struct frame));
+
+	if (!frame)
+		return false;
+
+	/* Set links */
+	page->accessible = writable;
+	frame->page = page;
+	page->frame = frame;
+	frame->kva = kva;
+
+	if(!pml4_set_page(thread_current()->pml4, page->va, frame->kva, false)) {
+		free(frame);
+		return false;
+	}
+
+	list_push_back(&frame_table, &frame->frame_elem);
+
+	return swap_in(page, frame->kva);
 }
